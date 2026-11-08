@@ -9,6 +9,7 @@ import android.media.AudioTrack
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.phonebibobibo.siren.EffectCategory
 import com.phonebibobibo.siren.SirenProgram
 import com.phonebibobibo.siren.SoundEffect
 import kotlin.math.PI
@@ -565,43 +566,387 @@ private class SirenSynth(private val sr: Int) {
         return tone * manGain * 0.7
     }
 
-    private fun effectSample(): Double = when (effect) {
-        SoundEffect.TRUCK_HORN -> truckHornSample()
-        SoundEffect.CAR_HORN -> carHornSample()
-        SoundEffect.CODE_BEEP -> codeBeepSample()
-        SoundEffect.STATION_CHIME -> stationChimeSample()
-        SoundEffect.SHIP_HORN -> shipHornSample()
-        SoundEffect.WARSHIP_HORN -> warshipHornSample()
-        SoundEffect.PORSCHE_REV -> engineSample(true)
-        SoundEffect.ACCEL -> engineSample(false)
+    private fun effectSample(): Double = when (effect.category) {
+        EffectCategory.HORN -> hornSample(effect)
+        EffectCategory.SHIP_RAIL -> when (effect) {
+            SoundEffect.STATION_CHIME,
+            SoundEffect.METRO_CHIME,
+            SoundEffect.CROSSING_BELL -> chimeSample(effect)
+            else -> hornSample(effect)
+        }
+        EffectCategory.ENGINE -> engineSample(effect)
+        EffectCategory.SIGNAL -> when (effect) {
+            SoundEffect.AIRPORT_CHIME,
+            SoundEffect.BICYCLE_BELL -> chimeSample(effect)
+            SoundEffect.CODE_BEEP -> codeBeepSample()
+            SoundEffect.MORSE -> morseSample()
+            SoundEffect.RADAR -> radarSample()
+            SoundEffect.SCHOOL_BELL -> schoolBellSample()
+            else -> 0.0
+        }
+        EffectCategory.SCENE -> when (effect) {
+            SoundEffect.ICE_CREAM -> iceCreamSample()
+            SoundEffect.REVERSING_BEEP -> reverseBeepSample(false)
+            SoundEffect.TRUCK_REVERSE -> reverseBeepSample(true)
+            SoundEffect.CONSTRUCTION_ALARM -> constructionSample()
+            SoundEffect.AIR_RAID -> airRaidSample()
+            SoundEffect.POLICE_PA -> policePaSample()
+            else -> 0.0
+        }
     }
 
-    /** Deep air horn: two low, slightly detuned tones with an air burst. */
-    private fun truckHornSample(): Double {
-        val dur = effect.durationMs / 1000.0
-        val env = attackRelease(modeT, dur, 0.06, 0.28)
-        val f1 = 196.0 * pitch
-        val f2 = 247.0 * pitch
-        val vib = 1.0 + 0.004 * sin(2 * PI * 5.5 * modeT)
-        val tone = wave(WaveType.SHARP, f1 * vib * modeT) * 0.50 +
-            wave(WaveType.SHARP, f2 * vib * modeT) * 0.55 +
-            wave(WaveType.BRIGHT, f1 * 0.5 * modeT) * 0.18
-        val burst = nextNoise() * 0.16 * exp(-modeT * 10.0)
-        val rough = 1.0 + 0.02 * sin(2 * PI * 13.0 * modeT)
-        return (tone * rough + burst) * env * 0.90
+    private data class Blast(val start: Double, val length: Double, val gain: Double = 1.0)
+
+    private data class HornSpec(
+        val freqs: List<Double>,
+        val wave: WaveType,
+        val attack: Double,
+        val release: Double,
+        val noise: Double,
+        val vibrato: Double = 0.0,
+        val vibratoHz: Double = 5.5,
+        val sub: Double = 0.0,
+        val wobble: Double = 0.0,
+        val blasts: List<Blast>? = null
+    )
+
+    private fun hornSpec(e: SoundEffect): HornSpec = when (e) {
+        SoundEffect.TRUCK_HORN -> HornSpec(
+            freqs = listOf(196.0, 247.0),
+            wave = WaveType.SHARP,
+            attack = 0.06,
+            release = 0.28,
+            noise = 0.16,
+            vibrato = 0.004,
+            sub = 0.5
+        )
+        SoundEffect.CAR_HORN -> HornSpec(
+            freqs = listOf(415.0, 523.0),
+            wave = WaveType.BRIGHT,
+            attack = 0.012,
+            release = 0.14,
+            noise = 0.0
+        )
+        SoundEffect.BUS_HORN -> HornSpec(
+            freqs = listOf(233.0, 311.0),
+            wave = WaveType.SHARP,
+            attack = 0.09,
+            release = 0.30,
+            noise = 0.10,
+            vibrato = 0.003,
+            vibratoHz = 4.5,
+            sub = 0.5
+        )
+        SoundEffect.MOTO_HORN -> HornSpec(
+            freqs = listOf(520.0, 660.0),
+            wave = WaveType.SHARP,
+            attack = 0.010,
+            release = 0.10,
+            noise = 0.02
+        )
+        SoundEffect.VINTAGE_HORN -> HornSpec(
+            freqs = listOf(190.0, 240.0),
+            wave = WaveType.SHARP,
+            attack = 0.040,
+            release = 0.18,
+            noise = 0.06,
+            wobble = 0.14
+        )
+        SoundEffect.TRAIN_HORN -> HornSpec(
+            freqs = listOf(311.0, 370.0, 466.0),
+            wave = WaveType.SHARP,
+            attack = 0.20,
+            release = 0.40,
+            noise = 0.12,
+            vibrato = 0.002,
+            vibratoHz = 4.0,
+            sub = 0.5
+        )
+        SoundEffect.SHIP_HORN -> HornSpec(
+            freqs = listOf(110.0, 164.81),
+            wave = WaveType.LOW,
+            attack = 0.30,
+            release = 0.55,
+            noise = 0.06,
+            vibrato = 0.006,
+            vibratoHz = 0.18,
+            sub = 0.5
+        )
+        SoundEffect.WARSHIP_HORN -> HornSpec(
+            freqs = listOf(220.0, 277.18),
+            wave = WaveType.SHARP,
+            attack = 0.025,
+            release = 0.10,
+            noise = 0.05,
+            blasts = listOf(
+                Blast(0.0, 0.45),
+                Blast(0.65, 0.45),
+                Blast(1.30, 0.90)
+            )
+        )
+        SoundEffect.CRUISE_HORN -> HornSpec(
+            freqs = listOf(147.0, 196.0, 247.0),
+            wave = WaveType.BRIGHT,
+            attack = 0.25,
+            release = 0.50,
+            noise = 0.08,
+            vibrato = 0.004,
+            vibratoHz = 0.12
+        )
+        else -> HornSpec(
+            freqs = listOf(200.0),
+            wave = WaveType.SHARP,
+            attack = 0.05,
+            release = 0.20,
+            noise = 0.05
+        )
     }
 
-    /** Electric car horn: bright major-third dual tone, short and sharp. */
-    private fun carHornSample(): Double {
-        val dur = effect.durationMs / 1000.0
-        val env = attackRelease(modeT, dur, 0.012, 0.14)
-        val f1 = 415.0 * pitch
-        val f2 = 523.0 * pitch
-        val tone = wave(WaveType.BRIGHT, f1 * modeT) * 0.55 +
-            wave(WaveType.BRIGHT, f2 * modeT) * 0.45 +
-            wave(WaveType.SHARP, f1 * modeT) * 0.18
-        val buzz = 1.0 + 0.015 * sin(2 * PI * 9.0 * modeT)
-        return tone * buzz * env * 0.90
+    private fun hornSample(e: SoundEffect): Double {
+        val spec = hornSpec(e)
+        val dur = e.durationMs / 1000.0
+        val env = spec.blasts?.let { blasts ->
+            var sum = 0.0
+            for (b in blasts) {
+                sum += blastEnv(modeT, b.start, b.length, spec.attack, spec.release) * b.gain
+            }
+            min(1.0, sum)
+        } ?: attackRelease(modeT, dur, spec.attack, spec.release)
+        if (env <= 0.0) return 0.0
+        val vib = 1.0 + spec.vibrato * sin(2 * PI * spec.vibratoHz * modeT)
+        val wobble = if (spec.wobble > 0.0) {
+            1.0 + spec.wobble * sin(2 * PI * 3.0 * modeT)
+        } else {
+            1.0
+        }
+        var tone = 0.0
+        spec.freqs.forEachIndexed { index, f ->
+            val gain = when (index) {
+                0 -> 0.50
+                1 -> 0.45
+                else -> 0.25
+            }
+            tone += wave(spec.wave, f * pitch * vib * wobble * modeT) * gain
+        }
+        if (spec.sub > 0.0) {
+            tone += wave(WaveType.BRIGHT, spec.freqs.first() * spec.sub * modeT) * 0.18
+        }
+        val burst = if (spec.noise > 0.0) {
+            nextNoise() * spec.noise * exp(-modeT * 8.0)
+        } else {
+            0.0
+        }
+        return (tone + burst) * env * 0.90
+    }
+
+    private enum class Timbre { BELL, SOFT, ELECTRONIC, MUSIC_BOX }
+
+    private data class Note(
+        val start: Double,
+        val freq: Double,
+        val decay: Double,
+        val gain: Double = 1.0
+    )
+
+    private data class ChimeSpec(
+        val notes: List<Note>,
+        val timbre: Timbre,
+        val amplitude: Double = 0.62
+    )
+
+    private fun chimeSpec(e: SoundEffect): ChimeSpec = when (e) {
+        SoundEffect.STATION_CHIME -> ChimeSpec(
+            notes = listOf(
+                Note(start = 0.05, freq = 1046.50, decay = 0.55),
+                Note(start = 0.62, freq = 783.99, decay = 0.75),
+                Note(start = 1.55, freq = 1046.50, decay = 0.55, gain = 0.85),
+                Note(start = 2.12, freq = 783.99, decay = 0.85, gain = 0.85)
+            ),
+            timbre = Timbre.BELL
+        )
+        SoundEffect.METRO_CHIME -> ChimeSpec(
+            notes = listOf(
+                Note(start = 0.00, freq = 1318.51, decay = 0.35),
+                Note(start = 0.18, freq = 1046.50, decay = 0.35),
+                Note(start = 0.36, freq = 783.99, decay = 0.45),
+                Note(start = 0.54, freq = 1046.50, decay = 0.55)
+            ),
+            timbre = Timbre.ELECTRONIC,
+            amplitude = 0.60
+        )
+        SoundEffect.AIRPORT_CHIME -> ChimeSpec(
+            notes = listOf(
+                Note(start = 0.00, freq = 523.25, decay = 0.80),
+                Note(start = 0.35, freq = 659.25, decay = 0.80),
+                Note(start = 0.70, freq = 783.99, decay = 0.90),
+                Note(start = 1.05, freq = 1046.50, decay = 1.10)
+            ),
+            timbre = Timbre.SOFT,
+            amplitude = 0.55
+        )
+        SoundEffect.CROSSING_BELL -> ChimeSpec(
+            notes = List(6) { i ->
+                Note(
+                    start = i * 0.5,
+                    freq = if (i % 2 == 0) 600.0 else 750.0,
+                    decay = 0.35
+                )
+            },
+            timbre = Timbre.BELL,
+            amplitude = 0.55
+        )
+        SoundEffect.BICYCLE_BELL -> ChimeSpec(
+            notes = listOf(
+                Note(start = 0.00, freq = 2200.0, decay = 0.40),
+                Note(start = 0.22, freq = 2400.0, decay = 0.45)
+            ),
+            timbre = Timbre.BELL,
+            amplitude = 0.50
+        )
+        else -> ChimeSpec(
+            notes = listOf(Note(start = 0.0, freq = 880.0, decay = 0.5)),
+            timbre = Timbre.BELL,
+            amplitude = 0.5
+        )
+    }
+
+    private fun chimeSample(e: SoundEffect): Double {
+        val spec = chimeSpec(e)
+        var sum = 0.0
+        for (n in spec.notes) {
+            sum += noteSample(modeT - n.start, n.freq * pitch, n.decay, spec.timbre) * n.gain
+        }
+        return sum * spec.amplitude
+    }
+
+    private fun noteSample(dt: Double, freq: Double, decay: Double, timbre: Timbre): Double {
+        if (dt < 0.0) return 0.0
+        val attack = min(1.0, dt / if (timbre == Timbre.SOFT) 0.02 else 0.008)
+        val env = attack * exp(-dt / decay)
+        val tone = when (timbre) {
+            Timbre.BELL -> sin(2 * PI * freq * dt) * 0.62 +
+                sin(2 * PI * freq * 2.01 * dt) * 0.24 +
+                sin(2 * PI * freq * 3.02 * dt) * 0.10 +
+                sin(2 * PI * freq * 4.20 * dt) * 0.04
+            Timbre.SOFT -> sin(2 * PI * freq * dt) * 0.70 +
+                sin(2 * PI * freq * 2.00 * dt) * 0.15 +
+                sin(2 * PI * freq * 3.00 * dt) * 0.05
+            Timbre.ELECTRONIC -> sin(2 * PI * freq * dt) * 0.55 +
+                sin(2 * PI * freq * 2.00 * dt) * 0.25 +
+                sin(2 * PI * freq * 3.00 * dt) * 0.08
+            Timbre.MUSIC_BOX -> sin(2 * PI * freq * dt) * 0.60 +
+                sin(2 * PI * freq * 2.01 * dt) * 0.20 +
+                sin(2 * PI * freq * 3.90 * dt) * 0.08
+        }
+        return tone * env
+    }
+
+    private enum class RevStyle { PORSCHE, ACCEL, MOTO, DIESEL, V8, RACE }
+
+    private data class EngineSpec(
+        val idle: Double,
+        val top: Double,
+        val harmonics: Int,
+        val noise: Double,
+        val whineHz: Double,
+        val pulseDepth: Double,
+        val style: RevStyle,
+        val shifts: List<Double> = emptyList()
+    )
+
+    private fun engineSpec(e: SoundEffect): EngineSpec = when (e) {
+        SoundEffect.PORSCHE_REV -> EngineSpec(
+            idle = 48.0, top = 160.0, harmonics = 14, noise = 0.10,
+            whineHz = 1800.0, pulseDepth = 0.05, style = RevStyle.PORSCHE
+        )
+        SoundEffect.ACCEL -> EngineSpec(
+            idle = 62.0, top = 240.0, harmonics = 14, noise = 0.10,
+            whineHz = 2600.0, pulseDepth = 0.05, style = RevStyle.ACCEL
+        )
+        SoundEffect.MOTO_REV -> EngineSpec(
+            idle = 90.0, top = 300.0, harmonics = 10, noise = 0.08,
+            whineHz = 3000.0, pulseDepth = 0.10, style = RevStyle.MOTO
+        )
+        SoundEffect.DIESEL_IDLE -> EngineSpec(
+            idle = 32.0, top = 78.0, harmonics = 8, noise = 0.14,
+            whineHz = 400.0, pulseDepth = 0.30, style = RevStyle.DIESEL
+        )
+        SoundEffect.V8_REV -> EngineSpec(
+            idle = 42.0, top = 115.0, harmonics = 18, noise = 0.12,
+            whineHz = 900.0, pulseDepth = 0.35, style = RevStyle.V8
+        )
+        SoundEffect.RACE_SHIFT -> EngineSpec(
+            idle = 70.0, top = 250.0, harmonics = 14, noise = 0.12,
+            whineHz = 2800.0, pulseDepth = 0.08, style = RevStyle.RACE,
+            shifts = listOf(0.36, 0.62)
+        )
+        else -> EngineSpec(
+            idle = 50.0, top = 150.0, harmonics = 12, noise = 0.10,
+            whineHz = 1200.0, pulseDepth = 0.05, style = RevStyle.PORSCHE
+        )
+    }
+
+    private fun engineSample(e: SoundEffect): Double {
+        val spec = engineSpec(e)
+        val dur = e.durationMs / 1000.0
+        val x = (modeT / dur).coerceIn(0.0, 1.0)
+        val curve = when (spec.style) {
+            RevStyle.PORSCHE -> when {
+                x < 0.08 -> 0.0
+                x < 0.52 -> smoothstep((x - 0.08) / 0.44)
+                x < 0.72 -> 1.0
+                x < 0.92 -> 1.0 - 0.55 * smoothstep((x - 0.72) / 0.20)
+                else -> 0.45 * (1.0 - smoothstep((x - 0.92) / 0.08))
+            }
+            RevStyle.ACCEL -> smoothstep(x)
+            RevStyle.MOTO -> when {
+                x < 0.35 -> smoothstep(x / 0.35)
+                x < 0.72 -> 1.0
+                else -> 1.0 - 0.65 * smoothstep((x - 0.72) / 0.28)
+            }
+            RevStyle.DIESEL -> 0.15 + 0.55 * smoothstep(x)
+            RevStyle.V8 -> when {
+                x < 0.55 -> smoothstep(x / 0.55)
+                x < 0.80 -> 1.0
+                else -> 1.0 - 0.60 * smoothstep((x - 0.80) / 0.20)
+            }
+            RevStyle.RACE -> when {
+                x < 0.05 -> 0.0
+                x < 0.85 -> smoothstep((x - 0.05) / 0.80)
+                else -> 1.0 - 0.80 * smoothstep((x - 0.85) / 0.15)
+            }
+        }
+        var shift = 1.0
+        for (s in spec.shifts) {
+            if (x > s) shift *= 0.78
+        }
+        val f = (spec.idle + (spec.top - spec.idle) * curve) * pitch * shift
+        fxPhaseA += f / sr
+        if (fxPhaseA >= 1.0) fxPhaseA -= floor(fxPhaseA)
+        fxPhaseB += (400.0 + spec.whineHz * curve) / sr
+        if (fxPhaseB >= 1.0) fxPhaseB -= floor(fxPhaseB)
+
+        var saw = 0.0
+        for (n in 1..spec.harmonics) {
+            saw += sin(2 * PI * fxPhaseA * n) / n
+        }
+        saw *= 0.22
+        val fundamental = sin(2 * PI * fxPhaseA) * 0.30
+        val pulseHz = if (spec.style == RevStyle.DIESEL || spec.style == RevStyle.V8) {
+            f * 0.5
+        } else {
+            f * 2.0
+        }
+        val pulse = 1.0 + spec.pulseDepth * sin(2 * PI * pulseHz * modeT)
+        val lump = if (spec.style == RevStyle.DIESEL) {
+            1.0 + 0.10 * sin(2 * PI * 3.1 * modeT)
+        } else {
+            1.0
+        }
+        val whine = sin(2 * PI * fxPhaseB) * 0.05 * curve
+        val noise = nextNoise() * (0.04 + spec.noise * curve)
+        val env = attackRelease(modeT, dur, 0.08, 0.35)
+        return (saw * pulse * lump + fundamental * pulse + whine + noise) * env * 0.95
     }
 
     /** Alternating high/low short beeps, like a recognition code. */
@@ -622,92 +967,156 @@ private class SirenSynth(private val sr: Int) {
         return tone * env * 0.85
     }
 
-    /** Railway-station two-tone "ding-dong", repeated once. */
-    private fun stationChimeSample(): Double {
-        val a = bell(modeT - 0.05, 1046.5, 0.55)
-        val b = bell(modeT - 0.62, 783.99, 0.75)
-        val c = bell(modeT - 1.55, 1046.5, 0.55) * 0.85
-        val d = bell(modeT - 2.12, 783.99, 0.85) * 0.85
-        return (a + b * 0.92 + c + d * 0.92) * 0.62
+    /** Morse SOS: three dots, three dashes, three dots. */
+    private fun morseSample(): Double {
+        val unit = 0.12
+        var cursor = 0.0
+        val marks = ArrayList<DoubleArray>()
+        val groups = listOf(
+            listOf(1, 1, 1),
+            listOf(3, 3, 3),
+            listOf(1, 1, 1)
+        )
+        for ((gi, group) in groups.withIndex()) {
+            for (symbol in group) {
+                marks.add(doubleArrayOf(cursor, symbol * unit))
+                cursor += symbol * unit + unit
+            }
+            if (gi < groups.lastIndex) cursor += 2.0 * unit
+        }
+        var env = 0.0
+        for (m in marks) {
+            val start = m[0]
+            val length = m[1]
+            if (modeT >= start && modeT < start + length) {
+                val local = modeT - start
+                env = min(1.0, local / 0.008) * min(1.0, (length - local) / 0.008)
+                break
+            }
+        }
+        if (env <= 0.0) return 0.0
+        val tone = sin(2 * PI * 700.0 * pitch * modeT) * 0.55 +
+            sin(2 * PI * 1400.0 * pitch * modeT) * 0.15
+        return tone * env * 0.80
     }
 
-    private fun bell(dt: Double, freq: Double, decay: Double): Double {
-        if (dt < 0.0) return 0.0
-        val attack = min(1.0, dt / 0.008)
-        val env = attack * exp(-dt / decay)
-        val f = freq * pitch
-        val tone = sin(2 * PI * f * dt) * 0.62 +
-            sin(2 * PI * f * 2.01 * dt) * 0.24 +
-            sin(2 * PI * f * 3.02 * dt) * 0.10 +
-            sin(2 * PI * f * 4.20 * dt) * 0.04
-        return tone * env
+    /** Sonar ping: a short decaying tone with a downward sweep. */
+    private fun radarSample(): Double {
+        val period = 1.10
+        val local = modeT % period
+        val env = if (local < 0.55) {
+            min(1.0, local / 0.004) * exp(-local / 0.22) * min(1.0, (0.55 - local) / 0.05)
+        } else {
+            0.0
+        }
+        if (env <= 0.0) return 0.0
+        val ping = sin(2 * PI * 1200.0 * pitch * local) * 0.55 +
+            sin(2 * PI * 2400.0 * pitch * local) * 0.20
+        val sweep = sin(2 * PI * (300.0 + 500.0 * local) * local) * 0.10
+        return (ping + sweep) * env * 0.80
     }
 
-    /** Low foghorn: root + fifth with a slow swell and a sub-octave rumble. */
-    private fun shipHornSample(): Double {
+    /** Continuous trilled electric school bell. */
+    private fun schoolBellSample(): Double {
         val dur = effect.durationMs / 1000.0
-        val env = attackRelease(modeT, dur, 0.30, 0.55)
-        val f1 = 110.0 * pitch
-        val f2 = 164.81 * pitch
-        val vib = 1.0 + 0.006 * sin(2 * PI * 0.18 * modeT)
-        val tone = sin(2 * PI * f1 * vib * modeT) * 0.42 +
-            sin(2 * PI * f2 * vib * modeT) * 0.34 +
-            sin(2 * PI * f1 * 2.0 * modeT) * 0.12 +
-            sin(2 * PI * f1 * 3.0 * modeT) * 0.06
-        val rumble = sin(2 * PI * 55.0 * modeT) * 0.16
-        val noise = nextNoise() * 0.06
-        return (tone + rumble) * env * 0.90 + noise * env * 0.6
+        val env = attackRelease(modeT, dur, 0.02, 0.25)
+        val trill = 0.5 + 0.5 * sin(2 * PI * 22.0 * modeT)
+        val tone = sin(2 * PI * 900.0 * pitch * modeT) * 0.50 +
+            sin(2 * PI * 1800.0 * pitch * modeT) * 0.20 +
+            sin(2 * PI * 2700.0 * pitch * modeT) * 0.08
+        return tone * trill * env * 0.80
     }
 
-    /** Sharp warship whistle: two short blasts, then one long blast. */
-    private fun warshipHornSample(): Double {
-        var env = blastEnv(modeT, 0.0, 0.45, 0.025, 0.10) +
-            blastEnv(modeT, 0.65, 0.45, 0.025, 0.10) +
-            blastEnv(modeT, 1.30, 0.90, 0.025, 0.12)
-        env = min(1.0, env)
-        val f1 = 220.0 * pitch
-        val f2 = 277.18 * pitch
-        val tone = wave(WaveType.SHARP, f1 * modeT) * 0.45 +
-            wave(WaveType.BRIGHT, f2 * modeT) * 0.40 +
-            sin(2 * PI * f1 * 0.5 * modeT) * 0.15
-        return tone * env * 0.84
+    /** Simple music-box melody associated with ice-cream trucks. */
+    private fun iceCreamSample(): Double {
+        val melody = listOf(
+            523.25 to 0.00,
+            659.25 to 0.30,
+            783.99 to 0.60,
+            659.25 to 0.90,
+            523.25 to 1.20,
+            659.25 to 1.50,
+            783.99 to 1.80,
+            880.00 to 2.10,
+            783.99 to 2.40,
+            659.25 to 2.70,
+            523.25 to 3.00
+        )
+        var sum = 0.0
+        for ((freq, start) in melody) {
+            sum += noteSample(modeT - start, freq * pitch, 0.50, Timbre.MUSIC_BOX)
+        }
+        return sum * 0.48
     }
 
-    /**
-     * Engine voice: a harmonically rich saw with a rev curve. PORSCHE_REV
-     * idles, pulls to redline and settles; ACCEL sweeps upward and fades.
-     */
-    private fun engineSample(rev: Boolean): Double {
+    /** Slow or fast reversing beep; the truck version adds a diesel rumble. */
+    private fun reverseBeepSample(deep: Boolean): Double {
+        val period = 1.0
+        val local = modeT % period
+        val on = 0.20
+        if (local >= on) return 0.0
+        val env = min(1.0, local / 0.01) * min(1.0, (on - local) / 0.03)
+        val freq = if (deep) 500.0 else 800.0
+        val tone = sin(2 * PI * freq * pitch * modeT) * 0.55 +
+            sin(2 * PI * freq * 2.0 * pitch * modeT) * 0.15
+        val diesel = if (deep) {
+            sin(2 * PI * 60.0 * modeT) * 0.12 + nextNoise() * 0.03
+        } else {
+            0.0
+        }
+        return (tone + diesel) * env * 0.85
+    }
+
+    /** Rapid alternating two-tone construction alarm. */
+    private fun constructionSample(): Double {
+        val period = 0.25
+        val index = (modeT / period).toInt()
+        val local = modeT - index * period
+        val on = 0.12
+        if (local >= on) return 0.0
+        val env = min(1.0, local / 0.006) * min(1.0, (on - local) / 0.02)
+        val freq = if (index % 2 == 0) 1000.0 else 800.0
+        val tone = sin(2 * PI * freq * pitch * modeT) * 0.55 +
+            sin(2 * PI * freq * 2.0 * pitch * modeT) * 0.15
+        return tone * env * 0.80
+    }
+
+    /** Air-raid siren: a slow rise and fall over the full duration. */
+    private fun airRaidSample(): Double {
         val dur = effect.durationMs / 1000.0
         val x = (modeT / dur).coerceIn(0.0, 1.0)
-        val curve = if (rev) {
-            when {
-                x < 0.08 -> 0.0
-                x < 0.52 -> smoothstep((x - 0.08) / 0.44)
-                x < 0.72 -> 1.0
-                x < 0.92 -> 1.0 - 0.55 * smoothstep((x - 0.72) / 0.20)
-                else -> 0.45 * (1.0 - smoothstep((x - 0.92) / 0.08))
-            }
-        } else {
-            smoothstep(x)
-        }
-        val f = (if (rev) 48.0 + 112.0 * curve else 62.0 + 178.0 * curve) * pitch
+        val f = (300.0 + 650.0 * (0.5 - 0.5 * cos(2 * PI * x))) * pitch
         fxPhaseA += f / sr
         if (fxPhaseA >= 1.0) fxPhaseA -= floor(fxPhaseA)
-        fxPhaseB += (600.0 + (if (rev) 1800.0 else 2600.0) * curve) / sr
-        if (fxPhaseB >= 1.0) fxPhaseB -= floor(fxPhaseB)
+        val env = attackRelease(modeT, dur, 0.10, 0.40)
+        val tone = sin(2 * PI * fxPhaseA) * 0.55 +
+            sin(2 * PI * fxPhaseA * 2.0) * 0.18 +
+            sin(2 * PI * fxPhaseA * 3.0) * 0.08
+        return tone * env * 0.85
+    }
 
-        var saw = 0.0
-        for (n in 1..14) {
-            saw += sin(2 * PI * fxPhaseA * n) / n
+    /** Police radio: a noise squelch followed by a two-tone test. */
+    private fun policePaSample(): Double {
+        val squelch = if (modeT < 0.08) {
+            nextNoise() * (1.0 - modeT / 0.08) * 0.35
+        } else {
+            0.0
         }
-        saw *= 0.22
-        val fundamental = sin(2 * PI * fxPhaseA) * 0.30
-        val firing = 1.0 + 0.05 * sin(2 * PI * 2.0 * f * modeT)
-        val whine = sin(2 * PI * fxPhaseB) * 0.05 * curve
-        val noise = nextNoise() * (0.05 + 0.10 * curve)
-        val env = attackRelease(modeT, dur, 0.08, 0.35)
-        return (saw * firing + fundamental * firing + whine + noise) * env * 0.95
+        val local = modeT - 0.10
+        val active = local >= 0.0 && local < 0.30
+        val env = if (active) {
+            min(1.0, local / 0.01) * min(1.0, (0.30 - local) / 0.02)
+        } else {
+            0.0
+        }
+        val tone = if (active) {
+            val f = if (local < 0.15) 900.0 else 1100.0
+            sin(2 * PI * f * pitch * local) * 0.45 +
+                sin(2 * PI * f * 2.0 * pitch * local) * 0.12
+        } else {
+            0.0
+        }
+        return (tone * env + squelch) * 0.85
     }
 
     private fun smoothstep(x: Double): Double {

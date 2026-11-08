@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -290,6 +292,7 @@ private fun SirenScreen(controller: SirenController) {
     val haptic = LocalHapticFeedback.current
     var showSettings by remember { mutableStateOf(false) }
     var showContact by remember { mutableStateOf(false) }
+    var showLibrary by remember { mutableStateOf(false) }
 
     val micLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -531,6 +534,17 @@ private fun SirenScreen(controller: SirenController) {
                 EffectCard(controller, SoundEffect.PORSCHE_REV, RedCard, Modifier.weight(1f))
                 EffectCard(controller, SoundEffect.ACCEL, AmberCard, Modifier.weight(1f))
             }
+            Spacer(Modifier.height(6.dp))
+            TacticalCard(
+                title = "全部音效",
+                subtitle = "${SoundEffect.entries.size} 种声音 · 点击展开",
+                palette = GoldCard,
+                height = 48.dp,
+                titleSize = 13.sp,
+                subtitleSize = 9.sp,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { showLibrary = true }
+            )
 
             SectionTitle("系统控制")
             Row(
@@ -593,6 +607,9 @@ private fun SirenScreen(controller: SirenController) {
     if (showContact) {
         ContactDialog(onDismiss = { showContact = false })
     }
+    if (showLibrary) {
+        EffectLibrarySheet(controller, onClose = { showLibrary = false })
+    }
 }
 
 @Composable
@@ -620,19 +637,128 @@ private fun EffectCard(
     controller: SirenController,
     effect: SoundEffect,
     palette: Palette,
-    modifier: Modifier
+    modifier: Modifier,
+    height: Dp = 50.dp,
+    titleSize: TextUnit = 12.sp,
+    subtitleSize: TextUnit = 8.sp
 ) {
     TacticalCard(
         title = effect.label,
         subtitle = effect.hint,
         palette = palette,
-        height = 50.dp,
-        titleSize = 12.sp,
-        subtitleSize = 8.sp,
+        height = height,
+        titleSize = titleSize,
+        subtitleSize = subtitleSize,
         modifier = modifier,
         active = controller.activeEffect == effect,
         onClick = { controller.playEffect(effect) }
     )
+}
+
+private fun paletteFor(category: EffectCategory): Palette = when (category) {
+    EffectCategory.HORN -> SteelCard
+    EffectCategory.SHIP_RAIL -> IndigoCard
+    EffectCategory.ENGINE -> RedCard
+    EffectCategory.SIGNAL -> TealCard
+    EffectCategory.SCENE -> AmberCard
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EffectLibrarySheet(controller: SirenController, onClose: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = Color(0xFF0F141B),
+        contentColor = TextPrimary,
+        scrimColor = Color(0xCC000000)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f)
+                .padding(horizontal = 14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "音效库",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${SoundEffect.entries.size} 种车辆、船舶、引擎与场景声音",
+                        color = Color(0xFF8B95A5),
+                        fontSize = 11.sp
+                    )
+                }
+                TextButton(onClick = onClose) {
+                    Text("关闭", color = Color(0xFFF29B38), fontSize = 13.sp)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            val active = controller.activeEffect
+            if (active != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "正在播放：${active.label}",
+                        color = Color(0xFFF29B38),
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { controller.muteAll() }) {
+                        Text("停止", color = Color(0xFFE86A6A), fontSize = 12.sp)
+                    }
+                }
+            } else {
+                Text("点按任意音效即可播放", color = Color(0xFF8B95A5), fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(4.dp))
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                EffectCategory.entries.forEach { category ->
+                    item(key = "title-${category.name}") {
+                        SectionTitle(category.label)
+                    }
+                    val rows = SoundEffect.entries
+                        .filter { it.category == category }
+                        .chunked(3)
+                    items(rows, key = { row -> "row-${category.name}-${row.first().name}" }) { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            row.forEach { effect ->
+                                EffectCard(
+                                    controller = controller,
+                                    effect = effect,
+                                    palette = paletteFor(category),
+                                    modifier = Modifier.weight(1f),
+                                    height = 54.dp,
+                                    titleSize = 12.sp,
+                                    subtitleSize = 8.5.sp
+                                )
+                            }
+                            repeat(3 - row.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(12.dp)) }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

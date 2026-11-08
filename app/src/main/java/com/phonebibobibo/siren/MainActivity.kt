@@ -511,6 +511,27 @@ private fun SirenScreen(controller: SirenController) {
                 )
             }
 
+            SectionTitle("车辆与场景音效")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                EffectCard(controller, SoundEffect.TRUCK_HORN, SteelCard, Modifier.weight(1f))
+                EffectCard(controller, SoundEffect.CAR_HORN, GoldCard, Modifier.weight(1f))
+                EffectCard(controller, SoundEffect.CODE_BEEP, TealCard, Modifier.weight(1f))
+                EffectCard(controller, SoundEffect.STATION_CHIME, IndigoCard, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                EffectCard(controller, SoundEffect.SHIP_HORN, SlateCard, Modifier.weight(1f))
+                EffectCard(controller, SoundEffect.WARSHIP_HORN, PurpleCard, Modifier.weight(1f))
+                EffectCard(controller, SoundEffect.PORSCHE_REV, RedCard, Modifier.weight(1f))
+                EffectCard(controller, SoundEffect.ACCEL, AmberCard, Modifier.weight(1f))
+            }
+
             SectionTitle("系统控制")
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -591,6 +612,26 @@ private fun SirenCard(
         modifier = modifier,
         active = controller.activeSiren == program,
         onClick = { controller.toggleSiren(program) }
+    )
+}
+
+@Composable
+private fun EffectCard(
+    controller: SirenController,
+    effect: SoundEffect,
+    palette: Palette,
+    modifier: Modifier
+) {
+    TacticalCard(
+        title = effect.label,
+        subtitle = effect.hint,
+        palette = palette,
+        height = 50.dp,
+        titleSize = 12.sp,
+        subtitleSize = 8.sp,
+        modifier = modifier,
+        active = controller.activeEffect == effect,
+        onClick = { controller.playEffect(effect) }
     )
 }
 

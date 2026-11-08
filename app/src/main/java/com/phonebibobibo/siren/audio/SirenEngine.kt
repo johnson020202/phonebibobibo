@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.phonebibobibo.siren.SirenProgram
+import com.phonebibobibo.siren.SoundEffect
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.exp
@@ -61,6 +62,12 @@ class SirenEngine(context: Context) {
     fun playSiren(program: SirenProgram) {
         synth.setProgram(program)
         Log.i(TAG, "siren=${program.name}")
+        wake()
+    }
+
+    fun playEffect(effect: SoundEffect) {
+        synth.setEffect(effect)
+        Log.i(TAG, "effect=${effect.name}")
         wake()
     }
 
@@ -231,7 +238,7 @@ private class SirenSynth(private val sr: Int) {
 
     private enum class WaveType { BRIGHT, SHARP, LOW }
     private enum class Motion { SWEEP, RISE, HILO, STEADY }
-    private enum class Mode { OFF, SIREN, AIR, MANUAL_HIGH, MANUAL_LOW }
+    private enum class Mode { OFF, SIREN, AIR, MANUAL_HIGH, MANUAL_LOW, EFFECT }
 
     private data class Layer(
         val low: Double,
@@ -263,6 +270,12 @@ private class SirenSynth(private val sr: Int) {
     private var airPhase2 = 0.0
     private var airNoise = 0.0
     private var noiseSeed = 0x12345678L
+
+    private var effect = SoundEffect.TRUCK_HORN
+    private var fxPhaseA = 0.0
+    private var fxPhaseB = 0.0
+    private var fxNoise = 0.0
+    private var fxSeed = 0x2468ACE1L
 
     private var manHeld = false
     private var manFreq = 560.0
@@ -296,6 +309,13 @@ private class SirenSynth(private val sr: Int) {
         program = p
         pending = Mode.SIREN
         if (mode == Mode.SIREN) restart = true
+    }
+
+    @Synchronized
+    fun setEffect(e: SoundEffect) {
+        effect = e
+        pending = Mode.EFFECT
+        if (mode == Mode.EFFECT) restart = true
     }
 
     @Synchronized
@@ -386,6 +406,10 @@ private class SirenSynth(private val sr: Int) {
                 }
                 Mode.MANUAL_HIGH -> sample = manualSample(dt, true) * modeGain
                 Mode.MANUAL_LOW -> sample = manualSample(dt, false) * modeGain
+                Mode.EFFECT -> {
+                    sample = effectSample() * modeGain
+                    if (modeT >= effect.durationMs / 1000.0) pending = Mode.OFF
+                }
                 Mode.OFF -> Unit
             }
 
@@ -424,6 +448,12 @@ private class SirenSynth(private val sr: Int) {
             }
             Mode.MANUAL_HIGH -> initManual(true)
             Mode.MANUAL_LOW -> initManual(false)
+            Mode.EFFECT -> {
+                fxPhaseA = 0.0
+                fxPhaseB = 0.0
+                fxNoise = 0.0
+                fxSeed = 0x2468ACE1L
+            }
             Mode.OFF -> Unit
         }
     }
@@ -533,6 +563,178 @@ private class SirenSynth(private val sr: Int) {
             wave(WaveType.BRIGHT, manPhase) * 0.7 + sin(PI * manPhase) * 0.15
         }
         return tone * manGain * 0.7
+    }
+
+    private fun effectSample(): Double = when (effect) {
+        SoundEffect.TRUCK_HORN -> truckHornSample()
+        SoundEffect.CAR_HORN -> carHornSample()
+        SoundEffect.CODE_BEEP -> codeBeepSample()
+        SoundEffect.STATION_CHIME -> stationChimeSample()
+        SoundEffect.SHIP_HORN -> shipHornSample()
+        SoundEffect.WARSHIP_HORN -> warshipHornSample()
+        SoundEffect.PORSCHE_REV -> engineSample(true)
+        SoundEffect.ACCEL -> engineSample(false)
+    }
+
+    /** Deep air horn: two low, slightly detuned tones with an air burst. */
+    private fun truckHornSample(): Double {
+        val dur = effect.durationMs / 1000.0
+        val env = attackRelease(modeT, dur, 0.06, 0.28)
+        val f1 = 196.0 * pitch
+        val f2 = 247.0 * pitch
+        val vib = 1.0 + 0.004 * sin(2 * PI * 5.5 * modeT)
+        val tone = wave(WaveType.SHARP, f1 * vib * modeT) * 0.50 +
+            wave(WaveType.SHARP, f2 * vib * modeT) * 0.55 +
+            wave(WaveType.BRIGHT, f1 * 0.5 * modeT) * 0.18
+        val burst = nextNoise() * 0.16 * exp(-modeT * 10.0)
+        val rough = 1.0 + 0.02 * sin(2 * PI * 13.0 * modeT)
+        return (tone * rough + burst) * env * 0.90
+    }
+
+    /** Electric car horn: bright major-third dual tone, short and sharp. */
+    private fun carHornSample(): Double {
+        val dur = effect.durationMs / 1000.0
+        val env = attackRelease(modeT, dur, 0.012, 0.14)
+        val f1 = 415.0 * pitch
+        val f2 = 523.0 * pitch
+        val tone = wave(WaveType.BRIGHT, f1 * modeT) * 0.55 +
+            wave(WaveType.BRIGHT, f2 * modeT) * 0.45 +
+            wave(WaveType.SHARP, f1 * modeT) * 0.18
+        val buzz = 1.0 + 0.015 * sin(2 * PI * 9.0 * modeT)
+        return tone * buzz * env * 0.90
+    }
+
+    /** Alternating high/low short beeps, like a recognition code. */
+    private fun codeBeepSample(): Double {
+        val cycle = 0.155
+        val lastIndex = 11
+        val index = (modeT / cycle).toInt().coerceAtMost(lastIndex)
+        val local = modeT - index * cycle
+        val on = if (index == lastIndex) 0.20 else 0.075
+        val freq = (if (index % 2 == 0) 1280.0 else 960.0) * pitch
+        val env = if (local < on) {
+            min(1.0, local / 0.008) * min(1.0, (on - local) / 0.015)
+        } else {
+            0.0
+        }
+        val tone = sin(2 * PI * freq * modeT) * 0.55 +
+            sin(2 * PI * freq * 2.0 * modeT) * 0.20
+        return tone * env * 0.85
+    }
+
+    /** Railway-station two-tone "ding-dong", repeated once. */
+    private fun stationChimeSample(): Double {
+        val a = bell(modeT - 0.05, 1046.5, 0.55)
+        val b = bell(modeT - 0.62, 783.99, 0.75)
+        val c = bell(modeT - 1.55, 1046.5, 0.55) * 0.85
+        val d = bell(modeT - 2.12, 783.99, 0.85) * 0.85
+        return (a + b * 0.92 + c + d * 0.92) * 0.62
+    }
+
+    private fun bell(dt: Double, freq: Double, decay: Double): Double {
+        if (dt < 0.0) return 0.0
+        val attack = min(1.0, dt / 0.008)
+        val env = attack * exp(-dt / decay)
+        val f = freq * pitch
+        val tone = sin(2 * PI * f * dt) * 0.62 +
+            sin(2 * PI * f * 2.01 * dt) * 0.24 +
+            sin(2 * PI * f * 3.02 * dt) * 0.10 +
+            sin(2 * PI * f * 4.20 * dt) * 0.04
+        return tone * env
+    }
+
+    /** Low foghorn: root + fifth with a slow swell and a sub-octave rumble. */
+    private fun shipHornSample(): Double {
+        val dur = effect.durationMs / 1000.0
+        val env = attackRelease(modeT, dur, 0.30, 0.55)
+        val f1 = 110.0 * pitch
+        val f2 = 164.81 * pitch
+        val vib = 1.0 + 0.006 * sin(2 * PI * 0.18 * modeT)
+        val tone = sin(2 * PI * f1 * vib * modeT) * 0.42 +
+            sin(2 * PI * f2 * vib * modeT) * 0.34 +
+            sin(2 * PI * f1 * 2.0 * modeT) * 0.12 +
+            sin(2 * PI * f1 * 3.0 * modeT) * 0.06
+        val rumble = sin(2 * PI * 55.0 * modeT) * 0.16
+        val noise = nextNoise() * 0.06
+        return (tone + rumble) * env * 0.90 + noise * env * 0.6
+    }
+
+    /** Sharp warship whistle: two short blasts, then one long blast. */
+    private fun warshipHornSample(): Double {
+        var env = blastEnv(modeT, 0.0, 0.45, 0.025, 0.10) +
+            blastEnv(modeT, 0.65, 0.45, 0.025, 0.10) +
+            blastEnv(modeT, 1.30, 0.90, 0.025, 0.12)
+        env = min(1.0, env)
+        val f1 = 220.0 * pitch
+        val f2 = 277.18 * pitch
+        val tone = wave(WaveType.SHARP, f1 * modeT) * 0.45 +
+            wave(WaveType.BRIGHT, f2 * modeT) * 0.40 +
+            sin(2 * PI * f1 * 0.5 * modeT) * 0.15
+        return tone * env * 0.84
+    }
+
+    /**
+     * Engine voice: a harmonically rich saw with a rev curve. PORSCHE_REV
+     * idles, pulls to redline and settles; ACCEL sweeps upward and fades.
+     */
+    private fun engineSample(rev: Boolean): Double {
+        val dur = effect.durationMs / 1000.0
+        val x = (modeT / dur).coerceIn(0.0, 1.0)
+        val curve = if (rev) {
+            when {
+                x < 0.08 -> 0.0
+                x < 0.52 -> smoothstep((x - 0.08) / 0.44)
+                x < 0.72 -> 1.0
+                x < 0.92 -> 1.0 - 0.55 * smoothstep((x - 0.72) / 0.20)
+                else -> 0.45 * (1.0 - smoothstep((x - 0.92) / 0.08))
+            }
+        } else {
+            smoothstep(x)
+        }
+        val f = (if (rev) 48.0 + 112.0 * curve else 62.0 + 178.0 * curve) * pitch
+        fxPhaseA += f / sr
+        if (fxPhaseA >= 1.0) fxPhaseA -= floor(fxPhaseA)
+        fxPhaseB += (600.0 + (if (rev) 1800.0 else 2600.0) * curve) / sr
+        if (fxPhaseB >= 1.0) fxPhaseB -= floor(fxPhaseB)
+
+        var saw = 0.0
+        for (n in 1..14) {
+            saw += sin(2 * PI * fxPhaseA * n) / n
+        }
+        saw *= 0.22
+        val fundamental = sin(2 * PI * fxPhaseA) * 0.30
+        val firing = 1.0 + 0.05 * sin(2 * PI * 2.0 * f * modeT)
+        val whine = sin(2 * PI * fxPhaseB) * 0.05 * curve
+        val noise = nextNoise() * (0.05 + 0.10 * curve)
+        val env = attackRelease(modeT, dur, 0.08, 0.35)
+        return (saw * firing + fundamental * firing + whine + noise) * env * 0.95
+    }
+
+    private fun smoothstep(x: Double): Double {
+        val t = x.coerceIn(0.0, 1.0)
+        return t * t * (3.0 - 2.0 * t)
+    }
+
+    private fun attackRelease(
+        t: Double, duration: Double, attack: Double, release: Double
+    ): Double {
+        if (t < 0.0 || t > duration) return 0.0
+        return min(1.0, t / attack) * min(1.0, (duration - t) / release)
+    }
+
+    private fun blastEnv(
+        t: Double, start: Double, length: Double, attack: Double, release: Double
+    ): Double {
+        val x = t - start
+        if (x < 0.0 || x > length) return 0.0
+        return min(1.0, x / attack) * min(1.0, (length - x) / release)
+    }
+
+    private fun nextNoise(): Double {
+        fxSeed = fxSeed * 1664525L + 1013904223L
+        val raw = (((fxSeed ushr 16) and 0xFFFF).toDouble() / 32768.0) - 1.0
+        fxNoise = fxNoise * 0.84 + raw * 0.16
+        return fxNoise
     }
 
     private fun subSample(dt: Double): Double {

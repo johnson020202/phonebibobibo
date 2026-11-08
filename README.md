@@ -3,7 +3,8 @@
 一个把 Android 手机变成警报器 / 警灯控制面板的小工具。使用 Kotlin + Jetpack Compose 编写，所有警报音由手机实时合成，不依赖网络。
 
 ![首页](docs/home.png)
-![巡航警报运行中](docs/active.png)
+![车辆音效运行中](docs/active.png)
+![车辆与场景音效](docs/effects.png)
 
 ## 功能
 
@@ -12,6 +13,7 @@
 - **战术警灯**：自动联动、模式 1/2/3、常亮；需要设备具备相机闪光灯。
 - **手动电笛**：高音 / 低音长按爬升，松开滑落或飞轮拖尾。
 - **9 种警报程序**：巡航、急促、追击、极速、颤音、救护 Hi-Lo、随机轮换等，另有双音并发 A/B。
+- **8 种车辆与场景音效**：大车气喇叭、汽车喇叭、暗号滴滴、高铁站叮咚、轮船汽笛、军舰汽笛、保时捷轰鸣、跑车加速；全部实时合成，点按即播。
 - **音量与音调**：设置页滑杆可调；应用在前台时，手机音量加/减键也可直接调节警报音量，百分比和音量 Toast 会同步更新。
 - **其他**：低功率模式、一键静音、重低音脉冲；活跃时保持屏幕常亮，切到后台自动停止声音和警灯。
 
@@ -30,6 +32,20 @@
 - 不申请网络权限，应用不联网。
 
 ## 更新说明 / Update Notes
+
+### v1.1.0
+
+**中文**
+
+- 新增 8 种车辆与场景音效：大车气喇叭、汽车喇叭、暗号滴滴、高铁站叮咚、轮船汽笛、军舰汽笛、保时捷轰鸣、跑车加速。
+- 全部音效继续使用手机实时合成，不增加网络与音频素材依赖；主界面新增“车辆与场景音效”区域。
+- 版本号更新为 1.1.0。
+
+**English**
+
+- Added eight vehicle and scene sounds: truck air horn, car horn, recognition beeps, railway-station chime, ship horn, warship whistle, Porsche-style engine rev and acceleration sweep.
+- All sounds are still synthesized in real time; no network or bundled audio assets. A new "Vehicle & Scene Sounds" section is on the main screen.
+- Version bumped to 1.1.0.
 
 ### v1.0.0
 

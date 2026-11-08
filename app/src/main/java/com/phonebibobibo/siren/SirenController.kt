@@ -33,6 +33,8 @@ class SirenController(context: Context) {
         private set
     var airHornActive by mutableStateOf(false)
         private set
+    var activeEffect by mutableStateOf<SoundEffect?>(null)
+        private set
     var muteFlash by mutableStateOf(false)
         private set
     var subBassOn by mutableStateOf(false)
@@ -51,11 +53,12 @@ class SirenController(context: Context) {
         private set
 
     val keepScreenOn: Boolean
-        get() = activeSiren != null || manualHeld || manualTail || recording ||
-            replaying || subBassOn || lightRunning
+        get() = activeSiren != null || activeEffect != null || manualHeld || manualTail ||
+            recording || replaying || subBassOn || lightRunning
 
     private var manualToken = 0
     private var airToken = 0
+    private var effectToken = 0
     private var muteToken = 0
 
     init {
@@ -73,6 +76,8 @@ class SirenController(context: Context) {
             recorder.stopPlayback()
             replaying = false
         }
+        activeEffect = null
+        effectToken++
         if (activeSiren == program) {
             activeSiren = null
             engine.stopMain()
@@ -95,6 +100,33 @@ class SirenController(context: Context) {
         refreshStatus()
     }
 
+    fun playEffect(effect: SoundEffect) {
+        if (recording) cancelRecording()
+        if (replaying) {
+            recorder.stopPlayback()
+            replaying = false
+        }
+        activeSiren = null
+        manualHeld = false
+        manualTail = false
+        airHornActive = false
+        activeEffect = effect
+        engine.playEffect(effect)
+        if (lightMode == LightMode.AUTO) {
+            torch.stop()
+            lightRunning = false
+        }
+        effectToken++
+        refreshStatus()
+        val token = effectToken
+        mainHandler.postDelayed({
+            if (token == effectToken) {
+                activeEffect = null
+                refreshStatus()
+            }
+        }, effect.durationMs + 120)
+    }
+
     fun triggerAirHorn() {
         if (recording) cancelRecording()
         if (replaying) {
@@ -102,6 +134,8 @@ class SirenController(context: Context) {
             replaying = false
         }
         activeSiren = null
+        activeEffect = null
+        effectToken++
         manualHeld = false
         manualTail = false
         subBassOn = false
@@ -129,6 +163,8 @@ class SirenController(context: Context) {
             replaying = false
         }
         activeSiren = null
+        activeEffect = null
+        effectToken++
         airHornActive = false
         manualHigh = high
         manualHeld = true
@@ -218,6 +254,8 @@ class SirenController(context: Context) {
 
     fun muteAll() {
         activeSiren = null
+        activeEffect = null
+        effectToken++
         manualHeld = false
         manualTail = false
         airHornActive = false
@@ -242,6 +280,8 @@ class SirenController(context: Context) {
     fun startRecording() {
         if (recording) return
         activeSiren = null
+        activeEffect = null
+        effectToken++
         manualHeld = false
         manualTail = false
         airHornActive = false
@@ -286,6 +326,8 @@ class SirenController(context: Context) {
 
     fun onBackground() {
         activeSiren = null
+        activeEffect = null
+        effectToken++
         manualHeld = false
         manualTail = false
         airHornActive = false
@@ -315,6 +357,8 @@ class SirenController(context: Context) {
 
     private fun onAudioLost() {
         activeSiren = null
+        activeEffect = null
+        effectToken++
         manualHeld = false
         manualTail = false
         airHornActive = false
@@ -345,6 +389,7 @@ class SirenController(context: Context) {
             manualHeld -> "手动电笛 · " + if (manualHigh) "高音爬升" else "低音爬升"
             manualTail -> "手动电笛 · " + if (manualHigh) "滑落" else "飞轮拖尾"
             airHornActive -> "气笛号角 · 触发"
+            activeEffect != null -> "车辆音效 · ${activeEffect?.label.orEmpty()}"
             activeSiren != null -> "运行中 · ${activeSiren?.label.orEmpty()}"
             lightRunning -> "警灯 · ${lightMode?.label.orEmpty()}"
             subBassOn -> "重低音脉冲 · 开启"

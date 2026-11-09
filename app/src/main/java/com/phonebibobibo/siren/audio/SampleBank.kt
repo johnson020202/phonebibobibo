@@ -46,7 +46,26 @@ class SampleBank(context: Context) {
         SoundEffect.TRUCK_REVERSE to R.raw.sfx_truck_reverse,
         SoundEffect.CONSTRUCTION_ALARM to R.raw.sfx_construction_alarm,
         SoundEffect.AIR_RAID to R.raw.sfx_air_raid,
-        SoundEffect.POLICE_PA to R.raw.sfx_police_pa
+        SoundEffect.POLICE_PA to R.raw.sfx_police_pa,
+        SoundEffect.PORSCHE_REV to R.raw.sfx_porsche_911,
+        SoundEffect.FERRARI_REV to R.raw.sfx_ferrari_v8,
+        SoundEffect.LAMBORGHINI_REV to R.raw.sfx_lamborghini_v10,
+        SoundEffect.MCLAREN_REV to R.raw.sfx_mclaren,
+        SoundEffect.TESLA_ACCEL to R.raw.sfx_tesla,
+        SoundEffect.BMW_M3_REV to R.raw.sfx_bmw_m3,
+        SoundEffect.AMG_REV to R.raw.sfx_amg_s63,
+        SoundEffect.AUDI_R8_REV to R.raw.sfx_audi_r8,
+        SoundEffect.CORVETTE_REV to R.raw.sfx_corvette,
+        SoundEffect.MUSTANG_REV to R.raw.sfx_mustang,
+        SoundEffect.AIRPORT_BOARDING to R.raw.sfx_airport_boarding,
+        SoundEffect.AIRPORT_ANNOUNCE to R.raw.sfx_airport_announce,
+        SoundEffect.AIRPORT_TRAIN to R.raw.sfx_airport_train,
+        SoundEffect.METRO_ARRIVAL to R.raw.sfx_metro_arrival,
+        SoundEffect.BUS_STOP to R.raw.sfx_bus_stop,
+        SoundEffect.BUS_ANNOUNCE to R.raw.sfx_bus_announce,
+        SoundEffect.STATION_CHIME to R.raw.sfx_rail_station,
+        SoundEffect.RAIL_DEPART to R.raw.sfx_rail_depart,
+        SoundEffect.RAIL_DOOR to R.raw.sfx_rail_door
     )
 
     private val soundIds = mutableMapOf<Int, SoundEffect>()

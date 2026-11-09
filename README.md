@@ -1,11 +1,12 @@
 # 手机警报器 · phonebibobibo
 
-一个把 Android 手机变成警报器 / 警灯控制面板的小工具。使用 Kotlin + Jetpack Compose 编写；警报程序由手机实时合成，22 种新增场景音效使用本地真实录音，不依赖网络。
+一个把 Android 手机变成警报器 / 警灯控制面板的小工具。使用 Kotlin + Jetpack Compose 编写；警报程序由手机实时合成，41 种场景音效使用本地真实录音，不依赖网络。
 
 ![首页](docs/home.png)
 ![气笛号角运行中](docs/active.png)
 ![车辆与场景音效](docs/effects.png)
 ![完整音效库](docs/library.png)
+![设置与更新](docs/settings.png)
 
 ## 功能
 
@@ -14,8 +15,11 @@
 - **战术警灯**：自动联动、模式 1/2/3、常亮；需要设备具备相机闪光灯。
 - **手动电笛**：高音 / 低音均点按开启，再点停止。
 - **9 种警报程序**：巡航、急促、追击、极速、颤音、救护 Hi-Lo、随机轮换等，另有双音并发 A/B。
-- **30 种车辆与场景音效**：车辆喇叭、船舶与轨道、引擎与速度、提示与暗号、更多场景五类；原有 8 种保留实时合成，新增 22 种改用本地真实录音。所有卡片都是点按播放、再点停止。
-- **音量与音调**：设置页滑杆可调；应用在前台时，手机音量加/减键也可直接调节警报音量，百分比和音量 Toast 会同步更新。
+- **47 种车辆与场景音效**：车辆喇叭、船舶与轨道、名车引擎、提示与暗号、交通提示、更多场景六类；其中 41 种使用本地真实录音，原有 8 种保留实时合成。所有卡片都是点按播放、再点停止。
+- **10 台名车引擎**：保时捷 911、法拉利 V8、兰博基尼 V10、迈凯伦赛车、特斯拉电动车、宝马 M3、奔驰 AMG S63、奥迪 R8、雪佛兰 Corvette、福特 Mustang GT，均使用对应车型的真实录音。
+- **交通提示音**：机场登机广播、航站楼广播、机场捷运，地铁关门/进站提示，公交到站/车厢广播，火车站台铃、高铁发车提示、列车关门提示。
+- **音量与音调**：设置页滑杆可调；应用在前台时，音量加/减键每次调节 1%，按住可连续无级调节，不弹系统音量条或 Toast。
+- **应用内更新**：设置页“检查更新”会读取 GitHub 最新 Release，发现新版本可下载 APK 并调起系统安装器覆盖安装。
 - **其他**：低功率模式、一键静音、重低音脉冲；活跃时保持屏幕常亮，切到后台自动停止声音和警灯。
 
 ## 构建
@@ -30,9 +34,30 @@
 
 - `RECORD_AUDIO`：车外广播录音。
 - `FLASHLIGHT`：战术警灯。
-- 不申请网络权限，应用不联网。
+- `INTERNET`：仅用于设置页“检查更新”和下载新版本 APK，不上传任何数据。
+- `REQUEST_INSTALL_PACKAGES`：安装应用内下载的新版本；首次使用需在系统设置中允许本应用安装未知应用。
 
 ## 更新说明 / Update Notes
+
+### v1.4.0
+
+**中文**
+
+- 新增“名车引擎”分类：保时捷 911、法拉利 V8、兰博基尼 V10、迈凯伦赛车、特斯拉、宝马 M3、奔驰 AMG S63、奥迪 R8、雪佛兰 Corvette、福特 Mustang GT，共 10 台车的真实录音。
+- 新增“交通提示”分类：机场登机广播/航站楼广播/机场捷运，地铁关门与进站提示，公交到站与车厢广播，火车站台铃、高铁发车提示、列车关门提示。
+- 音量键恢复为直接调节警报音量，步进改为 1%；按住音量键可连续无级调节，不再弹出系统音量条或 Toast。
+- 设置页新增“检查更新”：读取 GitHub 最新 Release，显示新版本号，下载 APK 后调起系统安装器覆盖安装；首次使用需允许安装未知应用。
+- 音效库现为 6 类 47 种，其中 41 种为本地真实录音；来源、作者和许可见 [ATTRIBUTIONS.md](ATTRIBUTIONS.md)。
+- 版本号更新为 1.4.0（versionCode 5）。
+
+**English**
+
+- New "Supercar engines" category with real recordings of ten cars: Porsche 911, Ferrari V8, Lamborghini V10, McLaren race car, Tesla, BMW M3, Mercedes-AMG S63, Audi R8, Chevrolet Corvette and Ford Mustang GT.
+- New "Transit" category: airport boarding/terminal announcements and AirTrain, metro door/arrival cues, bus stop/onboard announcements, railway station chime, high-speed departure cue and train door closing cue.
+- Hardware volume keys now adjust siren volume directly in 1% steps; hold for continuous adjustment with no system volume panel or toast.
+- Settings now has "Check for updates": it reads the latest GitHub Release, downloads the APK and opens the system installer. Allow installs from unknown apps on first use.
+- The library now has 47 effects in six categories, 41 of them local real recordings. Sources and licenses are in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+- Version bumped to 1.4.0 (versionCode 5).
 
 ### v1.3.0
 

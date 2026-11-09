@@ -1,8 +1,32 @@
 # 音效素材来源与许可
 
-本应用的警报程序与原有 8 种音效仍由手机实时合成。新增的 22 种车辆、船舶、引擎、提示与场景音效使用本地真实录音素材。
+本应用的警报程序与原有 8 种音效仍由手机实时合成。其余 41 种车辆、船舶、名车、提示、交通与场景音效使用本地真实录音素材。
 
 所有外部素材均经过裁剪、单声道化、响度归一化和 MP3 转码；这些修改不改变原始录音的归属。素材仅作为应用内音效使用，不再单独分发原始文件。
+
+## Freesound（v1.4.0 新增）
+
+| 应用内音效 | 原始素材 | 作者 | 许可 |
+| --- | --- | --- | --- |
+| 保时捷 911 | [vehicle car porsche 911 revving engine motor boxer](https://freesound.org/s/772802/) | jerry.berumen | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| 法拉利 V8 | [Ferrari start up and drive off.WAV](https://freesound.org/s/659560/) | EwanPenman11 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 兰博基尼 V10 | [Lambo Start Up Sound](https://freesound.org/s/564373/) | JaimeLopes | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 迈凯伦赛车 | [KimiMcl.aif](https://freesound.org/s/14829/) | Heigh-hoo | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 特斯拉电动车 | [TeslaTaxi](https://freesound.org/s/867738/) | Runeou | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 宝马 M3 | [BMWM3_02.wav](https://freesound.org/s/415275/) | ikbenraar | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 奔驰 AMG S63 | [S63 AMG V8 Engine Revs](https://freesound.org/s/505321/) | marcelweiss | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 奥迪 R8 | [Audi_R8_01.wav](https://freesound.org/s/429099/) | ikbenraar | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 雪佛兰 Corvette | [Big Cam C6 Corvette](https://freesound.org/s/712593/) | Angel_soto | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 福特 Mustang GT | [mustang 7.wav](https://freesound.org/s/205510/) | VacekH | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 机场登机广播 | [London Gatwick Airport Boarding Call PA Announcements and Ambience](https://freesound.org/s/159719/) | Liam125 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 机场航站楼广播 | [Airport boarding announcement.wav](https://freesound.org/s/117588/) | soundmary | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 机场捷运 | [SFO's Airtrain at San Francisco Airport](https://freesound.org/s/706363/) | mycompasstv | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 地铁进站提示 | [metro_perovo_arrival.wav](https://freesound.org/s/241925/) | alexbird | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| 公交到站提示 | [Stop Requested announcement (Mississauga Transit)](https://freesound.org/s/660515/) | chungus43A | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 公交车厢广播 | [Bus 2200 Lotte to Seoul with Announcements](https://freesound.org/s/855266/) | kasparbossers | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 火车站台铃 | [Switzerland Station Chime -SBB.wav](https://freesound.org/s/381178/) | klankbeeld | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 高铁发车提示 | [20231229 - ICE2 departure](https://freesound.org/s/718046/) | LG | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| 列车关门提示 | [Toronto Subway Door Chime](https://freesound.org/s/783758/) | chungus43A | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 ## Mixkit（Sound Effects Free License）
 

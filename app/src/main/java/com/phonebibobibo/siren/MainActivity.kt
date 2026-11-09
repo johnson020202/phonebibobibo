@@ -17,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,11 +68,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -89,13 +98,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.phonebibobibo.siren.audio.SirenEngine
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var controller: SirenController
-    private var volumeToast: Toast? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,18 +127,7 @@ class MainActivity : ComponentActivity() {
         when (event.keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    val step =
-                        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) 0.05f else -0.05f
-                    val next = (controller.volume + step).coerceIn(0f, 1f)
-                    controller.updateVolume(next)
-                    if (event.repeatCount == 0) {
-                        volumeToast?.cancel()
-                        volumeToast = Toast.makeText(
-                            this,
-                            "警报音量 ${(next * 100).roundToInt()}%",
-                            Toast.LENGTH_SHORT
-                        ).also { it.show() }
-                    }
+                    adjustVolume(controller, event.keyCode, event.repeatCount)
                 }
                 return true
             }
@@ -658,12 +657,38 @@ private fun paletteFor(category: EffectCategory): Palette = when (category) {
     EffectCategory.SHIP_RAIL -> IndigoCard
     EffectCategory.ENGINE -> RedCard
     EffectCategory.SIGNAL -> TealCard
+    EffectCategory.TRANSIT -> TealCard
     EffectCategory.SCENE -> AmberCard
 }
+
+private fun adjustVolume(controller: SirenController, keyCode: Int, repeatCount: Int) {
+    val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 1f else -1f
+    val step = 0.01f + minOf(repeatCount, 20) * 0.0005f
+    controller.updateVolume((controller.volume + direction * step).coerceIn(0f, 1f))
+}
+
+private fun Modifier.sirenVolumeKeys(controller: SirenController): Modifier =
+    onKeyEvent { event ->
+        if (event.type == KeyEventType.KeyDown &&
+            (event.key == Key.VolumeUp || event.key == Key.VolumeDown)
+        ) {
+            val keyCode = if (event.key == Key.VolumeUp) {
+                KeyEvent.KEYCODE_VOLUME_UP
+            } else {
+                KeyEvent.KEYCODE_VOLUME_DOWN
+            }
+            adjustVolume(controller, keyCode, 0)
+            true
+        } else {
+            false
+        }
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EffectLibrarySheet(controller: SirenController, onClose: () -> Unit) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onClose,
@@ -676,6 +701,9 @@ private fun EffectLibrarySheet(controller: SirenController, onClose: () -> Unit)
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f)
+                .focusRequester(focusRequester)
+                .sirenVolumeKeys(controller)
+                .focusable()
                 .padding(horizontal = 14.dp)
         ) {
             Row(
@@ -1066,6 +1094,8 @@ private fun AppFooter(onContact: () -> Unit) {
 @Composable
 private fun SettingsSheet(controller: SirenController, onClose: () -> Unit) {
     val context = LocalContext.current
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onClose,
@@ -1077,6 +1107,9 @@ private fun SettingsSheet(controller: SirenController, onClose: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .focusRequester(focusRequester)
+                .sirenVolumeKeys(controller)
+                .focusable()
                 .padding(horizontal = 22.dp)
                 .padding(bottom = 28.dp)
         ) {
@@ -1124,9 +1157,12 @@ private fun SettingsSheet(controller: SirenController, onClose: () -> Unit) {
                 )
             }
 
+            Spacer(Modifier.height(20.dp))
+            UpdateSection()
+
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "提示：警报程序由手机实时合成；22 种场景音效使用本地真实录音素材。连接蓝牙音箱或车载音响时效果更好。请勿贴近耳朵使用，长时间高音量可能损伤听力。",
+                text = "提示：警报程序由手机实时合成；41 种场景音效使用本地真实录音素材。连接蓝牙音箱或车载音响时效果更好。请勿贴近耳朵使用，长时间高音量可能损伤听力。",
                 color = Color(0xFF7E8A99),
                 fontSize = 10.5.sp,
                 lineHeight = 16.sp
@@ -1169,6 +1205,127 @@ private fun SettingsSheet(controller: SirenController, onClose: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun UpdateSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val manager = remember(context) { UpdateManager(context.applicationContext) }
+    var status by remember { mutableStateOf("当前版本 v${BuildConfig.VERSION_NAME}") }
+    var release by remember { mutableStateOf<UpdateManager.Release?>(null) }
+    var downloaded by remember { mutableStateOf<File?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("版本更新", color = TextPrimary, fontSize = 13.sp)
+            Spacer(Modifier.weight(1f))
+            Text("v${BuildConfig.VERSION_NAME}", color = Color(0xFFF29B38), fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(status, color = Color(0xFF7E8A99), fontSize = 10.5.sp, lineHeight = 15.sp)
+        if (busy && progress > 0f) {
+            Spacer(Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0xFF27303B))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(4.dp)
+                        .background(Color(0xFFF29B38))
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            when {
+                downloaded != null -> UpdateButton("安装更新", enabled = !busy) {
+                    val apk = downloaded ?: return@UpdateButton
+                    if (!manager.canInstall()) {
+                        manager.openInstallPermission()
+                        status = "请允许“安装未知应用”，返回后再点安装更新"
+                        return@UpdateButton
+                    }
+                    runCatching { manager.install(apk) }
+                        .onFailure { status = "无法打开安装器：${it.message ?: "请重试"}" }
+                }
+
+                release != null -> {
+                    val current = release ?: return@Row
+                    UpdateButton(
+                        if (busy) "下载中 ${(progress * 100).roundToInt()}%" else "下载 v${current.version}",
+                        enabled = !busy
+                    ) {
+                        scope.launch {
+                            busy = true
+                            progress = 0f
+                            status = "正在下载 v${current.version}…"
+                            runCatching {
+                                manager.download(current) { progress = it }
+                            }.onSuccess {
+                                downloaded = it
+                                status = "下载完成，点击安装更新（系统会再次确认）"
+                            }.onFailure {
+                                status = "下载失败：${it.message ?: "请稍后重试"}"
+                                progress = 0f
+                            }
+                            busy = false
+                        }
+                    }
+                }
+
+                else -> UpdateButton(if (busy) "检查中…" else "检查更新", enabled = !busy) {
+                    scope.launch {
+                        busy = true
+                        status = "正在检查最新版本…"
+                        when (val result = manager.check()) {
+                            is UpdateManager.CheckResult.Available -> {
+                                release = result.release
+                                status = "发现 v${result.release.version}，可下载更新"
+                            }
+
+                            UpdateManager.CheckResult.UpToDate ->
+                                status = "已是最新版本"
+
+                            is UpdateManager.CheckResult.Failed ->
+                                status = result.message
+                        }
+                        busy = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (enabled) Color(0xFF2A1B08) else Color(0xFF171D25))
+            .border(1.dp, if (enabled) Color(0xFF6B4315) else Color(0xFF2A333E), shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = text,
+            color = if (enabled) Color(0xFFF5B45F) else Color(0xFF69737F),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

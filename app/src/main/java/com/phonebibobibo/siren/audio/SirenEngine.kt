@@ -574,6 +574,7 @@ private class SirenSynth(private val sr: Int) {
 
     private fun effectSample(): Double = when (effect.category) {
         EffectCategory.HORN -> hornSample(effect)
+        EffectCategory.TRANSIT -> 0.0
         EffectCategory.SHIP_RAIL -> when (effect) {
             SoundEffect.STATION_CHIME,
             SoundEffect.METRO_CHIME,

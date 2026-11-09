@@ -270,6 +270,7 @@ private class SirenSynth(private val sr: Int) {
     private var airPhase1 = 0.0
     private var airPhase2 = 0.0
     private var airNoise = 0.0
+    private var airCycle = -1
     private var noiseSeed = 0x12345678L
 
     private var effect = SoundEffect.TRUCK_HORN
@@ -401,10 +402,7 @@ private class SirenSynth(private val sr: Int) {
             var sample = 0.0
             when (mode) {
                 Mode.SIREN -> sample = sirenSample() * modeGain
-                Mode.AIR -> {
-                    sample = airSample() * modeGain
-                    if (modeT >= AIR_DURATION) pending = Mode.OFF
-                }
+                Mode.AIR -> sample = airSample() * modeGain
                 Mode.MANUAL_HIGH -> sample = manualSample(dt, true) * modeGain
                 Mode.MANUAL_LOW -> sample = manualSample(dt, false) * modeGain
                 Mode.EFFECT -> {
@@ -446,6 +444,7 @@ private class SirenSynth(private val sr: Int) {
                 airPhase1 = 0.0
                 airPhase2 = 0.0
                 airNoise = 0.0
+                airCycle = 0
             }
             Mode.MANUAL_HIGH -> initManual(true)
             Mode.MANUAL_LOW -> initManual(false)
@@ -514,7 +513,14 @@ private class SirenSynth(private val sr: Int) {
     }
 
     private fun airSample(): Double {
-        val x = (modeT / AIR_DURATION).coerceIn(0.0, 1.0)
+        val cycle = (modeT / AIR_DURATION).toInt()
+        if (cycle != airCycle) {
+            airCycle = cycle
+            airPhase1 = 0.0
+            airPhase2 = 0.0
+            airNoise = 0.0
+        }
+        val x = ((modeT % AIR_DURATION) / AIR_DURATION).coerceIn(0.0, 1.0)
         val envelope = when {
             x < 0.012 -> x / 0.012
             x < 0.72 -> 1.0

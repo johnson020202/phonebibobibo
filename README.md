@@ -1,9 +1,9 @@
 # 手机警报器 · phonebibobibo
 
-一个把 Android 手机变成警报器 / 警灯控制面板的小工具。使用 Kotlin + Jetpack Compose 编写，所有警报音由手机实时合成，不依赖网络。
+一个把 Android 手机变成警报器 / 警灯控制面板的小工具。使用 Kotlin + Jetpack Compose 编写；警报程序由手机实时合成，22 种新增场景音效使用本地真实录音，不依赖网络。
 
 ![首页](docs/home.png)
-![车辆音效运行中](docs/active.png)
+![气笛号角运行中](docs/active.png)
 ![车辆与场景音效](docs/effects.png)
 ![完整音效库](docs/library.png)
 
@@ -12,9 +12,9 @@
 - **气笛号角**：点按触发约 1.2 秒气笛音。
 - **车外广播**：按住录音，松开后通过扬声器回放。
 - **战术警灯**：自动联动、模式 1/2/3、常亮；需要设备具备相机闪光灯。
-- **手动电笛**：高音 / 低音长按爬升，松开滑落或飞轮拖尾。
+- **手动电笛**：高音 / 低音均点按开启，再点停止。
 - **9 种警报程序**：巡航、急促、追击、极速、颤音、救护 Hi-Lo、随机轮换等，另有双音并发 A/B。
-- **30 种车辆与场景音效**：车辆喇叭、船舶与轨道、引擎与速度、提示与暗号、更多场景五类；大车气喇叭、汽车喇叭、暗号滴滴、高铁站叮咚、轮船汽笛、军舰汽笛、保时捷轰鸣、跑车加速等全部保留，点按即播，全部实时合成。
+- **30 种车辆与场景音效**：车辆喇叭、船舶与轨道、引擎与速度、提示与暗号、更多场景五类；原有 8 种保留实时合成，新增 22 种改用本地真实录音。所有卡片都是点按播放、再点停止。
 - **音量与音调**：设置页滑杆可调；应用在前台时，手机音量加/减键也可直接调节警报音量，百分比和音量 Toast 会同步更新。
 - **其他**：低功率模式、一键静音、重低音脉冲；活跃时保持屏幕常亮，切到后台自动停止声音和警灯。
 
@@ -33,6 +33,24 @@
 - 不申请网络权限，应用不联网。
 
 ## 更新说明 / Update Notes
+
+### v1.3.0
+
+**中文**
+
+- 统一交互：音效卡片、气笛号角和手动高/低电笛全部改为“点一下播放，再点一下停止”；不再需要长按。
+- 新增 22 种真实录音素材，覆盖公交车/摩托/老式/火车/游轮汽笛、地铁关门音、道口警铃、摩托与柴油/V8/赛车引擎、SOS 摩斯、雷达、机场登机音、学校铃、自行车铃、冰淇淋车、倒车提示、施工警报、空袭警报和警用扩音器。
+- 原有 8 种音效继续使用实时合成，保留原有响应与音色；新增音效使用本地 MP3，离线可用。
+- 音效来源、作者和许可见 [ATTRIBUTIONS.md](ATTRIBUTIONS.md)；应用内设置页也可打开该说明。
+- 版本号更新为 1.3.0。
+
+**English**
+
+- Unified interaction: every effect card, the air horn and both manual sirens are now "tap to play, tap again to stop"; no long-press required.
+- Added 22 real recordings covering bus/motorcycle/vintage/train/cruise horns, metro door chime, crossing bell, motorcycle/diesel/V8/race engines, SOS Morse, radar, airport chime, school bell, bicycle bell, ice-cream truck, reversing beeps, construction alarm, air-raid siren and police PA.
+- The original eight effects remain real-time synthesized; the new sounds are bundled local MP3s and work offline.
+- Sources, authors and licenses are listed in [ATTRIBUTIONS.md](ATTRIBUTIONS.md), also reachable from Settings.
+- Version bumped to 1.3.0.
 
 ### v1.2.0
 

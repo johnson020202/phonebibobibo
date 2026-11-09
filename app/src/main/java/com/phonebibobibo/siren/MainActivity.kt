@@ -330,7 +330,7 @@ private fun SirenScreen(controller: SirenController) {
             ) {
                 TacticalCard(
                     title = "气笛号角",
-                    subtitle = "点按触发",
+                    subtitle = "点按开 / 再按停",
                     palette = RedCard,
                     height = 58.dp,
                     titleSize = 19.sp,
@@ -425,33 +425,31 @@ private fun SirenScreen(controller: SirenController) {
             ) {
                 TacticalCard(
                     title = "高音电笛",
-                    subtitle = "长按爬升 / 松开滑落",
+                    subtitle = "点按开 / 再按停",
                     palette = GoldCard,
                     height = 54.dp,
                     titleSize = 19.sp,
                     subtitleSize = 9.5.sp,
                     modifier = Modifier.weight(1f),
                     active = controller.manualHeld && controller.manualHigh,
-                    onPress = {
+                    onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        controller.startManual(true)
-                    },
-                    onRelease = { controller.releaseManual() }
+                        controller.toggleManual(true)
+                    }
                 )
                 TacticalCard(
                     title = "低音电笛",
-                    subtitle = "长按爬升 / 飞轮拖尾",
+                    subtitle = "点按开 / 再按停",
                     palette = GoldCard,
                     height = 54.dp,
                     titleSize = 19.sp,
                     subtitleSize = 9.5.sp,
                     modifier = Modifier.weight(1f),
                     active = controller.manualHeld && !controller.manualHigh,
-                    onPress = {
+                    onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        controller.startManual(false)
-                    },
-                    onRelease = { controller.releaseManual() }
+                        controller.toggleManual(false)
+                    }
                 )
             }
 
@@ -651,7 +649,7 @@ private fun EffectCard(
         subtitleSize = subtitleSize,
         modifier = modifier,
         active = controller.activeEffect == effect,
-        onClick = { controller.playEffect(effect) }
+        onClick = { controller.toggleEffect(effect) }
     )
 }
 
@@ -719,7 +717,7 @@ private fun EffectLibrarySheet(controller: SirenController, onClose: () -> Unit)
                     }
                 }
             } else {
-                Text("点按任意音效即可播放", color = Color(0xFF8B95A5), fontSize = 11.sp)
+                Text("点按播放 · 再点一次停止", color = Color(0xFF8B95A5), fontSize = 11.sp)
             }
             Spacer(Modifier.height(4.dp))
             LazyColumn(
@@ -1067,6 +1065,7 @@ private fun AppFooter(onContact: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsSheet(controller: SirenController, onClose: () -> Unit) {
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onClose,
@@ -1127,10 +1126,26 @@ private fun SettingsSheet(controller: SirenController, onClose: () -> Unit) {
 
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "提示：所有警报音由手机实时合成。连接蓝牙音箱或车载音响时效果更好。请勿贴近耳朵使用，长时间高音量可能损伤听力。",
+                text = "提示：警报程序由手机实时合成；22 种场景音效使用本地真实录音素材。连接蓝牙音箱或车载音响时效果更好。请勿贴近耳朵使用，长时间高音量可能损伤听力。",
                 color = Color(0xFF7E8A99),
                 fontSize = 10.5.sp,
                 lineHeight = 16.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "音效来源与许可：Mixkit / Wikimedia Commons / Freesound",
+                color = Color(0xFF9CB7D8),
+                fontSize = 10.sp,
+                modifier = Modifier.clickable {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/johnson020202/phonebibobibo/blob/main/ATTRIBUTIONS.md")
+                            )
+                        )
+                    }
+                }
             )
             Spacer(Modifier.height(20.dp))
             Box(

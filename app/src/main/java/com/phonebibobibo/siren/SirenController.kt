@@ -9,12 +9,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.phonebibobibo.siren.audio.SampleBank
 import com.phonebibobibo.siren.audio.SirenEngine
 
 class SirenController(context: Context) {
 
     private val appContext = context.applicationContext
     val engine = SirenEngine(appContext)
+    private val samples = SampleBank(appContext)
     private val torch = TorchController(appContext)
     private val recorder = BroadcastRecorder(appContext)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -80,7 +82,7 @@ class SirenController(context: Context) {
         effectToken++
         if (activeSiren == program) {
             activeSiren = null
-            engine.stopMain()
+            stopAllAudio()
             if (lightMode == LightMode.AUTO) {
                 torch.stop()
                 lightRunning = false
@@ -92,6 +94,7 @@ class SirenController(context: Context) {
         manualHeld = false
         manualTail = false
         airHornActive = false
+        samples.stop()
         activeSiren = program
         engine.playSiren(program)
         if (lightMode == LightMode.AUTO) {
@@ -111,7 +114,13 @@ class SirenController(context: Context) {
         manualTail = false
         airHornActive = false
         activeEffect = effect
-        engine.playEffect(effect)
+        if (samples.has(effect)) {
+            engine.stopAll()
+            samples.play(effect)
+        } else {
+            samples.stop()
+            engine.playEffect(effect)
+        }
         if (lightMode == LightMode.AUTO) {
             torch.stop()
             lightRunning = false
@@ -127,7 +136,25 @@ class SirenController(context: Context) {
         }, effect.durationMs + 120)
     }
 
+    fun toggleEffect(effect: SoundEffect) {
+        if (activeEffect == effect) {
+            activeEffect = null
+            effectToken++
+            stopAllAudio()
+            refreshStatus()
+        } else {
+            playEffect(effect)
+        }
+    }
+
     fun triggerAirHorn() {
+        if (airHornActive) {
+            airHornActive = false
+            airToken++
+            stopAllAudio()
+            refreshStatus()
+            return
+        }
         if (recording) cancelRecording()
         if (replaying) {
             recorder.stopPlayback()
@@ -139,6 +166,7 @@ class SirenController(context: Context) {
         manualHeld = false
         manualTail = false
         subBassOn = false
+        samples.stop()
         engine.setSubBass(false)
         engine.playAirHorn()
         airHornActive = true
@@ -147,13 +175,6 @@ class SirenController(context: Context) {
             lightRunning = false
         }
         refreshStatus()
-        val token = ++airToken
-        mainHandler.postDelayed({
-            if (token == airToken) {
-                airHornActive = false
-                refreshStatus()
-            }
-        }, 1_250)
     }
 
     fun startManual(high: Boolean) {
@@ -166,6 +187,7 @@ class SirenController(context: Context) {
         activeEffect = null
         effectToken++
         airHornActive = false
+        samples.stop()
         manualHigh = high
         manualHeld = true
         manualTail = false
@@ -178,19 +200,16 @@ class SirenController(context: Context) {
         refreshStatus()
     }
 
-    fun releaseManual() {
-        if (!manualHeld) return
-        manualHeld = false
-        engine.releaseManual()
-        manualTail = true
-        refreshStatus()
-        val token = ++manualToken
-        mainHandler.postDelayed({
-            if (token == manualToken) {
-                manualTail = false
-                refreshStatus()
-            }
-        }, 1_900)
+    fun toggleManual(high: Boolean) {
+        if (manualHeld && manualHigh == high) {
+            manualHeld = false
+            manualTail = false
+            manualToken++
+            stopAllAudio()
+            refreshStatus()
+            return
+        }
+        startManual(high)
     }
 
     fun toggleLight(mode: LightMode) {
@@ -240,11 +259,13 @@ class SirenController(context: Context) {
     fun toggleLowPower() {
         lowPower = !lowPower
         engine.setLowPower(lowPower)
+        samples.setLowPower(lowPower)
     }
 
     fun updateVolume(value: Float) {
         volume = value.coerceIn(0f, 1f)
         engine.setVolume(volume)
+        samples.setVolume(volume)
     }
 
     fun updateTranspose(semitones: Int) {
@@ -263,7 +284,7 @@ class SirenController(context: Context) {
         if (recording) cancelRecording()
         recorder.stopPlayback()
         replaying = false
-        engine.stopAll()
+        stopAllAudio()
         torch.stop()
         lightRunning = false
         lightMode = null
@@ -289,7 +310,7 @@ class SirenController(context: Context) {
             recorder.stopPlayback()
             replaying = false
         }
-        engine.stopAll()
+        stopAllAudio()
         torch.stop()
         lightRunning = false
         lightMode = null
@@ -335,7 +356,7 @@ class SirenController(context: Context) {
         if (recording) cancelRecording()
         recorder.stopPlayback()
         replaying = false
-        engine.stopAll()
+        stopAllAudio()
         torch.stop()
         lightRunning = false
         lightMode = null
@@ -345,8 +366,14 @@ class SirenController(context: Context) {
     fun release() {
         onBackground()
         engine.release()
+        samples.release()
         recorder.release()
         torch.release()
+    }
+
+    private fun stopAllAudio() {
+        engine.stopAll()
+        samples.stop()
     }
 
     private fun cancelRecording() {
@@ -363,6 +390,7 @@ class SirenController(context: Context) {
         manualTail = false
         airHornActive = false
         subBassOn = false
+        stopAllAudio()
         torch.stop()
         lightRunning = false
         lightMode = null
@@ -386,8 +414,8 @@ class SirenController(context: Context) {
         statusText = when {
             recording -> "录音中 · 松开结束"
             replaying -> "回放中 · 车外广播"
-            manualHeld -> "手动电笛 · " + if (manualHigh) "高音爬升" else "低音爬升"
-            manualTail -> "手动电笛 · " + if (manualHigh) "滑落" else "飞轮拖尾"
+            manualHeld -> "手动电笛 · " + if (manualHigh) "高音持续" else "低音持续"
+            manualTail -> "手动电笛 · " + if (manualHigh) "高音持续" else "低音持续"
             airHornActive -> "气笛号角 · 触发"
             activeEffect != null -> "车辆音效 · ${activeEffect?.label.orEmpty()}"
             activeSiren != null -> "运行中 · ${activeSiren?.label.orEmpty()}"
